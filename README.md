@@ -107,3 +107,6 @@ This is a personal project, but suggestions and improvements are welcome through
 ---
 
 **Created by Carlos Daniel Vieira** - Botniel WhatsApp AI Bot
+
+https://github.com/carldanvm
+
