@@ -1,0 +1,14 @@
+{
+  "watch": ["*.js", "*.json"],
+  "ext": "js,json",
+  "ignore": [
+    "node_modules/**",
+    ".git/**",
+    ".wwebjs_auth/**",
+    ".wwebjs_session/**",
+    "session.json",
+    "currentChats.json"
+  ],
+  "delay": 1000,
+  "exec": "node index.js"
+}

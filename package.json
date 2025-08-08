@@ -1,0 +1,30 @@
+{
+  "name": "whatsapp-ai-bot",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/carldanvm/whatsapp-ai-bot.git"
+  },
+  "author": "Carlos Vieira",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/carldanvm/whatsapp-ai-bot/issues"
+  },
+  "homepage": "https://github.com/carldanvm/whatsapp-ai-bot#readme",
+  "description": "",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.59.0",
+    "dotenv": "^17.2.1",
+    "qrcode-terminal": "^0.12.0",
+    "whatsapp-web.js": "^1.31.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.10"
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "triggerWord": "botniel",
+  "allowedToReplyContacts": [
+    "mom",
+    "dad"
+  ],
+  "allowedToReplyChats": [
+    "test",
+    "family group",
+    "work group"
+  ]
+}
