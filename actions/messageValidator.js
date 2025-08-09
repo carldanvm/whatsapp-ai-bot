@@ -10,6 +10,7 @@ const { triggerWord, allowedToReplyContacts, allowedToReplyChats } = require('./
 module.exports.validateMessage = async (message, contact, chat) => {
     // Don't respond to messages sent by the bot itself
     if (message.fromMe) {
+        console.log("🚫 Message rejected: sent by bot itself");
         return {
             isTriggered: false,
             shouldProcessContact: false,

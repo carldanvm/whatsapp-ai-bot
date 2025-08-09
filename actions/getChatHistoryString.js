@@ -1,5 +1,5 @@
 module.exports.getChatHistoryString = async (chat) => {
-    const chatHistory = await chat.fetchMessages({limit: 30})
+    const chatHistory = await chat.fetchMessages({limit: 50})
     const parsedChatHistory = await Promise.all(chatHistory.map(async(message) => {
         const contact = await message.getContact()
         
