@@ -9,6 +9,7 @@ WhatsApp AI bot that automatically responds to messages from specific contacts a
 - **Configurable Prompt**: System prompt is loaded from your local `config.json` (kept out of Git)
 - **Optional Trigger Word**: If `triggerWord` is omitted or empty, the bot triggers on any non‑self message
 - **Chat History Context**: Analyzes recent conversation history for better responses (last 50 messages)
+- **Image Generation (OpenAI)**: Generate images via OpenAI with the `/generateimage` command
 
 ## 📋 Prerequisites
 
@@ -91,6 +92,12 @@ WhatsApp AI bot that automatically responds to messages from specific contacts a
    - If `triggerWord` is empty or omitted: any non‑self message from an allowed contact/group will be processed
    - The bot will respond with an AI-generated message
 
+4. **Generate images (OpenAI provider only)**
+   - Command: `/generateimage <your-description>`
+   - Works even with a trigger word, e.g. `{triggerWord} /generateimage a cute dog`
+   - The bot first replies: `Processing your image request...`, then sends the image
+   - Requires `AIprovider: "openai"` in `config.json` and a valid `OPENAI_API_KEY`
+
 
 ## 🤖 How It Works
 
@@ -99,8 +106,13 @@ WhatsApp AI bot that automatically responds to messages from specific contacts a
 3. **Trigger Detection**: If `triggerWord` is set, checks its presence; otherwise always triggers (excluding self messages)
 4. **Context Analysis**: Retrieves recent chat history for context
 5. **AI Processing**: Sends prompts to the selected provider (Anthropic or OpenAI)
-6. **Response Generation**: Claude generates contextually appropriate response
+6. **Response Generation**: The selected provider generates a text response; when `/generateimage` is used, OpenAI generates an image that is sent as media
 7. **Message Sending**: Bot sends AI response back to the chat
+
+## ⏱️ Concurrency
+
+- The bot processes a maximum of 2 tasks at the same time (text or image across all chats).
+- If 2 tasks are already running, new requests receive: "I'm currently busy processing other messages. Please try again in a moment."
 
 
 ## 📄 License

@@ -28,6 +28,21 @@ async function generateWithOpenAI(systemPrompt, userPrompt) {
   return completion.choices?.[0]?.message?.content || "";
 }
 
+// Image generation (OpenAI only)
+async function generateImageWithOpenAI(prompt, size = "1024x1024") {
+  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  const result = await openai.images.generate({
+    model: "gpt-image-1",
+    prompt,
+    size,
+    moderation: "low",
+    quality: "low"
+  });
+  const b64 = result?.data?.[0]?.b64_json;
+  if (!b64) throw new Error("OpenAI image generation returned no data");
+  return b64;
+}
+
 module.exports.generateMessage = async (chatHistoryString, mainMessageToReply) => {
   if (!configuredSystemPrompt || typeof configuredSystemPrompt !== "string" || configuredSystemPrompt.trim() === "") {
     throw new Error("systemPrompt is required in config.json");
@@ -47,5 +62,17 @@ module.exports.generateMessage = async (chatHistoryString, mainMessageToReply) =
   } catch (error) {
     console.error("Error generating message:", error);
     return "Sorry, I'm not available right now.";
+  }
+};
+
+module.exports.generateImage = async (prompt, size = "1024x1024") => {
+  if (AIprovider !== "openai") {
+    throw new Error("Image generation is only supported when AIprovider is 'openai'.");
+  }
+  try {
+    return await generateImageWithOpenAI(prompt, size);
+  } catch (error) {
+    console.error("Error generating image:", error);
+    throw error;
   }
 };
