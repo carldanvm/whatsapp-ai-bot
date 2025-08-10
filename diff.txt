@@ -1,0 +1,313 @@
+diff --git a/.env.example b/.env.example
+index 89e4a56..1698807 100644
+--- a/.env.example
++++ b/.env.example
+@@ -1 +1,3 @@
+-CLAUDE_API_KEY=
+\ No newline at end of file
++ANTHROPIC_API_KEY=
++
++OPENAI_API_KEY=
+\ No newline at end of file
+diff --git a/actions/botConfig.js b/actions/botConfig.js
+index 31f404c..0e1871a 100644
+--- a/actions/botConfig.js
++++ b/actions/botConfig.js
+@@ -2,13 +2,6 @@
+ const fs = require('fs');
+ const path = require('path');
+ 
+-// Default configuration
+-const defaultConfig = {
+-    triggerWord: "botniel",
+-    allowedToReplyContacts: [],
+-    allowedToReplyChats: []
+-};
+-
+ // Load user configuration
+ let userConfig = {};
+ const configPath = path.join(__dirname, '..', 'config.json');
+@@ -18,19 +11,27 @@ try {
+         const configFile = fs.readFileSync(configPath, 'utf8');
+         userConfig = JSON.parse(configFile);
+     } else {
+-        console.warn('⚠️  config.json not found. Please create it from config.example.json');
++        throw new Error('config.json not found. Please create it from config.example.json');
+     }
+ } catch (error) {
+     console.error('❌ Error loading config.json:', error.message);
++    throw error;
+ }
+ 
+-// Merge configurations
++// Build final config (no defaults other than safe normalizations)
+ const config = {
+-    ...defaultConfig,
+-    ...userConfig,
+-    // Ensure arrays are lowercase
+-    allowedToReplyContacts: (userConfig.allowedToReplyContacts || []).map(contact => contact.toLowerCase()),
+-    allowedToReplyChats: (userConfig.allowedToReplyChats || []).map(chat => chat.toLowerCase())
++    // If triggerWord is not provided, set to empty string to enable "always trigger" behavior
++    triggerWord: typeof userConfig.triggerWord === 'undefined' ? '' : userConfig.triggerWord,
++    // Ensure arrays exist and are lowercase to avoid runtime errors elsewhere
++    allowedToReplyContacts: Array.isArray(userConfig.allowedToReplyContacts)
++        ? userConfig.allowedToReplyContacts.map(contact => String(contact).toLowerCase())
++        : [],
++    allowedToReplyChats: Array.isArray(userConfig.allowedToReplyChats)
++        ? userConfig.allowedToReplyChats.map(chat => String(chat).toLowerCase())
++        : [],
++    // Optional system prompt (as-is, no transformations)
++    systemPrompt: userConfig.systemPrompt,
++    AIprovider: userConfig.AIprovider,
+ };
+ 
+ module.exports = config;
+diff --git a/actions/generateMessage.js b/actions/generateMessage.js
+index 6af80b7..d0aac76 100644
+--- a/actions/generateMessage.js
++++ b/actions/generateMessage.js
+@@ -1,58 +1,49 @@
+ const { Anthropic } = require("@anthropic-ai/sdk");
+-require('dotenv').config();
+-
+-const ai = new Anthropic({
+-  apiKey: process.env.CLAUDE_API_KEY,
+-});
+-
+-module.exports.generateMessage = async (
+-  chatHistoryString,
+-  mainMessageToReply
+-) => {
+-  const systemPrompt = `You are Botniel, a regular human participant in this WhatsApp chat. You're NOT an AI assistant - you're just another friend in the group.
+-
+-PERSONALITY:
+-- Act like a normal person, not a helpful AI or encyclopedia
+-- Don't try to solve everyone's problems or be overly helpful
+-- You have opinions, preferences, and can be wrong about things
+-- Sometimes you don't know things, and that's okay
+-- You participate naturally in conversations without being pushy
+-
+-COMMUNICATION STYLE:
+-- Match the group's language, tone, and humor style
+-- If the group uses jokes, teasing, or even offensive banter between friends, you can participate naturally
+-- Use minimal emojis - only when it feels natural, not excessive
+-- Occasionally make minor typos or grammar mistakes (missing capitals, commas) to seem human, but don't overdo it
+-- Mirror the writing style you see in the chat history
+-
+-IMPORTANT NOTES:
+-- Messages labeled "Botniel" in the chat history are YOUR previous messages - maintain consistency with that personality
+-- Adapt to the group dynamics - if they're casual and joke around, be casual too
+-- Don't be the "helpful bot" - be a participant who contributes to the conversation naturally
+-- You can disagree, have bad takes, or just chat about random stuff
+-
+-Just respond naturally to the conversation. Don't mention being an AI, assistant, or having instructions.
++const { OpenAI } = require("openai");
++require("dotenv").config();
++const { systemPrompt: configuredSystemPrompt, AIprovider } = require("./botConfig");
++
++async function generateWithAnthropic(systemPrompt, userPrompt) {
++  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
++  const response = await anthropic.messages.create({
++    model: "claude-sonnet-4-0",
++    max_tokens: 1000,
++    messages: [
++      { role: "system", content: systemPrompt },
++      { role: "user", content: userPrompt },
++    ],
++  });
++  return response.content[0].text;
++}
++
++async function generateWithOpenAI(systemPrompt, userPrompt) {
++  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
++  const completion = await openai.chat.completions.create({
++    model: "gpt-5",
++    messages: [
++      { role: "system", content: systemPrompt },
++      { role: "user", content: userPrompt },
++    ],  
++  });
++  return completion.choices?.[0]?.message?.content || "";
++}
++
++module.exports.generateMessage = async (chatHistoryString, mainMessageToReply) => {
++  if (!configuredSystemPrompt || typeof configuredSystemPrompt !== "string" || configuredSystemPrompt.trim() === "") {
++    throw new Error("systemPrompt is required in config.json");
++  }
+ 
+-CHAT HISTORY:
+-${chatHistoryString}`;
++  const systemPrompt = configuredSystemPrompt + `\n\nCHAT HISTORY:\n${chatHistoryString}`;
++  const userPrompt = `MAIN MESSAGE TO RESPOND TO:\n${mainMessageToReply}`;
+ 
+   try {
+-    const response = await ai.messages.create({
+-      model: "claude-sonnet-4-0",
+-      max_tokens: 1000,
+-      messages: [
+-        {
+-          role: "user",
+-          content: `${systemPrompt}
+-
+-MAIN MESSAGE TO RESPOND TO:
+-${mainMessageToReply}`,
+-        },
+-      ],
+-    });
+-    
+-    const aiResponse = response.content[0].text;
+-    return aiResponse;
++    if (AIprovider === "anthropic") {
++      return await generateWithAnthropic(systemPrompt, userPrompt);
++    }
++    if (AIprovider === "openai") {
++      return await generateWithOpenAI(systemPrompt, userPrompt);
++    }
++    throw new Error("Unsupported AIprovider. Use 'anthropic' or 'openai'.");
+   } catch (error) {
+     console.error("Error generating message:", error);
+     return "Sorry, I'm not available right now.";
+diff --git a/actions/messageValidator.js b/actions/messageValidator.js
+index 59751ae..46041fa 100644
+--- a/actions/messageValidator.js
++++ b/actions/messageValidator.js
+@@ -27,9 +27,11 @@ module.exports.validateMessage = async (message, contact, chat) => {
+     const isAllowedChat = allowedToReplyChats.includes(chatNameLower) || 
+                          allowedToReplyChats.includes(chat.id);
+     
+-    /* const isTriggered = message.body.toLowerCase().includes(triggerWord.toLowerCase()); */
+-    //ALWAYS TRIGGER, THIS IS JUST FOR TESTING
+-    const isTriggered = true;
++    // If triggerWord is empty/undefined, trigger on any non-self message
++    const normalizedTrigger = (triggerWord || "").toLowerCase();
++    const isTriggered = normalizedTrigger === "" 
++        ? true 
++        : message.body.toLowerCase().includes(normalizedTrigger);
+     
+     return {
+         isTriggered,
+diff --git a/config.example.json b/config.example.json
+index 4b20bbf..cfef622 100644
+--- a/config.example.json
++++ b/config.example.json
+@@ -1,12 +1,7 @@
+ {
+-  "triggerWord": "botniel",
+-  "allowedToReplyContacts": [
+-    "mom",
+-    "dad"
+-  ],
+-  "allowedToReplyChats": [
+-    "test",
+-    "family group",
+-    "work group"
+-  ]
++  "triggerWord": "your-trigger-word",
++  "allowedToReplyContacts": ["your-contact-names"],
++  "allowedToReplyChats": ["your-group-chats"],
++  "systemPrompt": "ai-prompt",
++  "AIprovider": "openai-or-anthropic"
+ }
+diff --git a/package-lock.json b/package-lock.json
+index 8ca0dcc..a91bb92 100644
+--- a/package-lock.json
++++ b/package-lock.json
+@@ -11,6 +11,7 @@
+       "dependencies": {
+         "@anthropic-ai/sdk": "^0.59.0",
+         "dotenv": "^17.2.1",
++        "openai": "^5.12.2",
+         "qrcode-terminal": "^0.12.0",
+         "whatsapp-web.js": "^1.31.0"
+       },
+@@ -1082,6 +1083,27 @@
+         "wrappy": "1"
+       }
+     },
++    "node_modules/openai": {
++      "version": "5.12.2",
++      "resolved": "https://registry.npmjs.org/openai/-/openai-5.12.2.tgz",
++      "integrity": "sha512-xqzHHQch5Tws5PcKR2xsZGX9xtch+JQFz5zb14dGqlshmmDAFBFEWmeIpf7wVqWV+w7Emj7jRgkNJakyKE0tYQ==",
++      "license": "Apache-2.0",
++      "bin": {
++        "openai": "bin/cli"
++      },
++      "peerDependencies": {
++        "ws": "^8.18.0",
++        "zod": "^3.23.8"
++      },
++      "peerDependenciesMeta": {
++        "ws": {
++          "optional": true
++        },
++        "zod": {
++          "optional": true
++        }
++      }
++    },
+     "node_modules/path-is-absolute": {
+       "version": "1.0.1",
+       "resolved": "https://registry.npmjs.org/path-is-absolute/-/path-is-absolute-1.0.1.tgz",
+@@ -1210,6 +1232,27 @@
+       "integrity": "sha512-sGkPx+VjMtmA6MX27oA4FBFELFCZZ4S4XqeGOXCv68tT+jb3vk/RyaKWP0PTKyWtmLSM0b+adUTEvbs1PEaH2w==",
+       "license": "MIT"
+     },
++    "node_modules/puppeteer-core/node_modules/ws": {
++      "version": "8.9.0",
++      "resolved": "https://registry.npmjs.org/ws/-/ws-8.9.0.tgz",
++      "integrity": "sha512-Ja7nszREasGaYUYCI2k4lCKIRTt+y7XuqVoHR44YpI49TtryyqbqvDMn5eqfW7e6HzTukDRIsXqzVHScqRcafg==",
++      "license": "MIT",
++      "engines": {
++        "node": ">=10.0.0"
++      },
++      "peerDependencies": {
++        "bufferutil": "^4.0.1",
++        "utf-8-validate": "^5.0.2"
++      },
++      "peerDependenciesMeta": {
++        "bufferutil": {
++          "optional": true
++        },
++        "utf-8-validate": {
++          "optional": true
++        }
++      }
++    },
+     "node_modules/qrcode-terminal": {
+       "version": "0.12.0",
+       "resolved": "https://registry.npmjs.org/qrcode-terminal/-/qrcode-terminal-0.12.0.tgz",
+@@ -1591,16 +1634,18 @@
+       "license": "ISC"
+     },
+     "node_modules/ws": {
+-      "version": "8.9.0",
+-      "resolved": "https://registry.npmjs.org/ws/-/ws-8.9.0.tgz",
+-      "integrity": "sha512-Ja7nszREasGaYUYCI2k4lCKIRTt+y7XuqVoHR44YpI49TtryyqbqvDMn5eqfW7e6HzTukDRIsXqzVHScqRcafg==",
++      "version": "8.18.3",
++      "resolved": "https://registry.npmjs.org/ws/-/ws-8.18.3.tgz",
++      "integrity": "sha512-PEIGCY5tSlUt50cqyMXfCzX+oOPqN0vuGqWzbcJ2xvnkzkq46oOpz7dQaTDBdfICb4N14+GARUDw2XV2N4tvzg==",
+       "license": "MIT",
++      "optional": true,
++      "peer": true,
+       "engines": {
+         "node": ">=10.0.0"
+       },
+       "peerDependencies": {
+         "bufferutil": "^4.0.1",
+-        "utf-8-validate": "^5.0.2"
++        "utf-8-validate": ">=5.0.2"
+       },
+       "peerDependenciesMeta": {
+         "bufferutil": {
+diff --git a/package.json b/package.json
+index f2f0c0e..dc38275 100644
+--- a/package.json
++++ b/package.json
+@@ -21,6 +21,7 @@
+   "dependencies": {
+     "@anthropic-ai/sdk": "^0.59.0",
+     "dotenv": "^17.2.1",
++    "openai": "^5.12.2",
+     "qrcode-terminal": "^0.12.0",
+     "whatsapp-web.js": "^1.31.0"
+   },
