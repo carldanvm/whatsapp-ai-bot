@@ -1,12 +1,7 @@
 {
-  "triggerWord": "botniel",
-  "allowedToReplyContacts": [
-    "mom",
-    "dad"
-  ],
-  "allowedToReplyChats": [
-    "test",
-    "family group",
-    "work group"
-  ]
+  "triggerWord": "your-trigger-word",
+  "allowedToReplyContacts": ["your-contact-names"],
+  "allowedToReplyChats": ["your-group-chats"],
+  "systemPrompt": "ai-prompt",
+  "AIprovider": "openai-or-anthropic"
 }

@@ -27,7 +27,11 @@ module.exports.validateMessage = async (message, contact, chat) => {
     const isAllowedChat = allowedToReplyChats.includes(chatNameLower) || 
                          allowedToReplyChats.includes(chat.id);
     
-    const isTriggered = message.body.toLowerCase().includes(triggerWord.toLowerCase());
+    // If triggerWord is empty/undefined, trigger on any non-self message
+    const normalizedTrigger = (triggerWord || "").toLowerCase();
+    const isTriggered = normalizedTrigger === "" 
+        ? true 
+        : message.body.toLowerCase().includes(normalizedTrigger);
     
     return {
         isTriggered,

@@ -2,9 +2,9 @@ const { validateMessage } = require('./messageValidator');
 const { processMessage } = require('./messageProcessor');
 const { logRejectedMessage } = require('./messageLogger');
 
-// Simple queue management - maximum 3 concurrent messages
+// Simple queue management - maximum 2 concurrent messages (text or image)
 let processingCount = 0;
-const MAX_CONCURRENT_MESSAGES = 3;
+const MAX_CONCURRENT_MESSAGES = 2;
 
 /**
  * Main handler for processing incoming messages

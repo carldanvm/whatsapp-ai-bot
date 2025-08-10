@@ -1,5 +1,6 @@
 const { getChatHistoryString } = require('./getChatHistoryString');
-const { generateMessage } = require('./generateMessage');
+const { generateMessage, generateImage } = require('./generateMessage');
+const { MessageMedia } = require('whatsapp-web.js');
 
 /**
  * Processes a valid message and generates a Botniel response
@@ -19,6 +20,32 @@ module.exports.processMessage = async (message, contact, chat, messageType) => {
         const mainMessageToReply = contact.name + ": " + message.body;
         
         console.log("📝 Chat History:", chatHistoryString);
+
+        // Image generation command: allow '/generateimage' anywhere (e.g., '<trigger> /generateimage ...')
+        const rawBody = String(message.body || "");
+        const marker = "/generateimage";
+        const lower = rawBody.toLowerCase();
+        const idx = lower.indexOf(marker);
+        if (idx !== -1) {
+            const prompt = rawBody.slice(idx + marker.length).trim();
+            if (!prompt) {
+                await message.reply("Please provide a description after '/generateimage'.");
+                return { success: false, error: "empty image prompt" };
+            }
+            await message.reply("Processing your image request...");
+            console.log("🖼️ Generating image with prompt:", prompt);
+            try {
+                const b64 = await generateImage(prompt, "1024x1024");
+                const media = new MessageMedia("image/png", b64, "image.png");
+                await message.reply(media);
+                console.log("📤 Image sent successfully");
+                return { success: true, response: "[image sent]" };
+            } catch (imgErr) {
+                console.error("❌ Error generating/sending image:", imgErr);
+                await message.reply("Sorry, I couldn't generate that image right now.");
+                return { success: false, error: imgErr.message };
+            }
+        }
         
         // Generate response with Claude
         console.log("🤖 Generating Botniel response...");
